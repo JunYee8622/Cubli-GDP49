@@ -189,7 +189,9 @@ while time < simulate_time and abs(np.rad2deg(theta)) < 45: # Stop if the cube f
 
 
     T_demand = pid_control(Arr_thetaMeasured[-delayCycles], Arr_thetaVelMeasured[-delayCycles], Arr_wheelVMeasured[-delayCycles], Arr_cumulativeError[-delayCycles], Kp = 3.3, Ki = 0.001, Kd = 0.23, Kp2 = 0.001, maxT = max_motor_torque, use = True)
+    T_friction = MD.MotorFrictionTorque(60*WheelVRelative/(2*np.pi))
     T_wheel, saturated = MD.delivered_torque(60*WheelVRelative/(2*np.pi), T_demand/K, 6, K)
+    T_wheel += T_friction
     time += dt # Update time
     if saturated:
         print("motor saturated")

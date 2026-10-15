@@ -9,6 +9,12 @@ TorqueConstant = 36e-3 #Nm/A
 
 v_in = 24 #V
 '''
+def MotorFrictionTorque(wheelSpeedrpm, noLoadI = 238e-3, K =36e-3):
+    wheelSpeed = wheelSpeedrpm *(2*np.pi)/60
+    wheelFrictionT = noLoadI * K
+    wheelFrictionT *= np.sign(wheelSpeed) * -1
+    return(wheelFrictionT)
+    
 
 def motor_characteristics(omegarpm = np.linspace(0, NoLoadSpeed, 100),NoLoadSpeed = 6250, StallTorque = 918e-3, maxContinuousTorque = 110e-3, plot=False, K = 36e-3):
     omega = omegarpm *(2*np.pi)/60
