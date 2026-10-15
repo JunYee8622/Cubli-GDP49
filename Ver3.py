@@ -127,18 +127,19 @@ theta = np.deg2rad(5) # initial angle (degrees)
 theta_vel = 0 # initial angular velocity (rad/s)
 time = 0
 WheelV = 0 # initial wheel velocity (rad/s)
+WheelVRelative = 0
 angles = []
 timepoints = []
 WheelVels = []
 T_wheel = 0 # initial wheel torque
 trueAngleDelta = angle_offset(x_dist, y_dist)
-relativeV = 0
 cumulative_error = 0 # For integral control of wheel speed
+saturated = False
 
 print(f"trueAngleDelta: {np.rad2deg(trueAngleDelta)}")
-delayTime = 0.012 # s
-delayCycles = int(delayTime/dt)
-print(f"reading processing delayed by: {delayCycles} cycles ({delayCycles * dt} seconds)")
+delayTime = 27e-3 # s
+delayCycles = int(delayTime/dt) - 1 
+print(f"reading processing delayed by: {delayCycles} cycles ({delayCycles * dt } seconds)")
 
 Arr_thetaMeasured = []
 Arr_thetaVelMeasured = []
@@ -146,7 +147,7 @@ Arr_wheelVMeasured = []
 Arr_cumulativeError = []
 
 for i in range(0, delayCycles):
-    Arr_thetaMeasured.append(np.deg2rad(theta))
+    Arr_thetaMeasured.append(theta)
     Arr_thetaVelMeasured.append(theta_vel)
     Arr_wheelVMeasured.append(WheelV)
     Arr_cumulativeError.append(cumulative_error)
@@ -160,23 +161,26 @@ while time < simulate_time and abs(np.rad2deg(theta)) < 45: # Stop if the cube f
     
     wheel_angular_acceleration = wheel_AAc(T_wheel, I_wheel)
     WheelV += wheel_angular_acceleration * dt # Update wheel velocity based on angular acceleration
-    WheelVels.append(60*WheelV/(2*np.pi)) #angular velocity in rpm
+    
 
 
     body_angular_acceleration = body_AAc(T_grav, T_dist, T_wheel, Ip)
     theta_vel += body_angular_acceleration * dt # Update angular velocity based on angular acceleration
     theta += theta_vel * dt # Update angle based on angular velocity
+    
+    WheelVRelative = WheelV - theta_vel #relative velocity required for motor torque and wheel V measurements
+    WheelVels.append(60*WheelVRelative/(2*np.pi)) #angular velocity in rpm
+
     angles.append(np.rad2deg(theta))
     timepoints.append(time)
-    relativeV = WheelV - theta_vel
-    if abs(T_wheel) < max_motor_torque:
-        cumulative_error += relativeV * dt # Update cumulative error for integral control - time multiplied in to allow for change in time step
+    if saturated ==False:
+        cumulative_error += WheelVRelative * dt # Update cumulative error for integral control - time multiplied in to allow for change in time step
     else:
         pass
 
     theta_measured = theta + random.uniform(np.deg2rad(-0.1), np.deg2rad(0.1)) # Add noise to the angle measurement
     theta_vel_measured = theta_vel + random.uniform(np.deg2rad(-1), np.deg2rad(1)) # Add noise to the angular velocity measurement
-    WheelV_measured = WheelV + random.uniform(np.deg2rad(-1), np.deg2rad(1)) # Add noise to the wheel velocity measurement
+    WheelV_measured = WheelVRelative + random.uniform(np.deg2rad(-1), np.deg2rad(1)) # Add noise to the wheel velocity measurement
 
     Arr_thetaMeasured.append(theta_measured)
     Arr_thetaVelMeasured.append(theta_vel_measured)
@@ -184,8 +188,8 @@ while time < simulate_time and abs(np.rad2deg(theta)) < 45: # Stop if the cube f
     Arr_cumulativeError.append(cumulative_error)
 
 
-    T_demand = pid_control(Arr_thetaMeasured[-delayCycles], Arr_thetaVelMeasured[-delayCycles], Arr_wheelVMeasured[-delayCycles], Arr_cumulativeError[-delayCycles], Kp = 3.3, Ki = 0.001, Kd = 0.23, Kp2 = 0.01, maxT = max_motor_torque, use = True)
-    T_wheel, saturated = MD.delivered_torque(60*WheelV/(2*np.pi), T_demand/K, 6, K)
+    T_demand = pid_control(Arr_thetaMeasured[-delayCycles], Arr_thetaVelMeasured[-delayCycles], Arr_wheelVMeasured[-delayCycles], Arr_cumulativeError[-delayCycles], Kp = 3.3, Ki = 0.001, Kd = 0.23, Kp2 = 0.001, maxT = max_motor_torque, use = True)
+    T_wheel, saturated = MD.delivered_torque(60*WheelVRelative/(2*np.pi), T_demand/K, 6, K)
     time += dt # Update time
     if saturated:
         print("motor saturated")
@@ -193,6 +197,7 @@ while time < simulate_time and abs(np.rad2deg(theta)) < 45: # Stop if the cube f
 fig, ax = plt.subplots(1, 2, figsize=(10, 5))
 ax[0].plot(timepoints, angles); ax[0].set_title('Cube Angle vs Time'); ax[0].set_xlabel('Time (s)'); ax[0].set_ylabel('Angle (degrees)')
 ax[1].plot(timepoints, WheelVels); ax[1].set_title('Wheel Velocity vs Time'); ax[1].set_xlabel('Time (s)'); ax[1].set_ylabel('Wheel Velocity (rpm)')
+
 
 plt.show()
 
