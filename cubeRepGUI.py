@@ -1,0 +1,93 @@
+import pygame
+import numpy as np
+import BodyDyn as BD
+import time
+
+pygame.init()
+
+screen = pygame.display.set_mode((1280, 720))
+
+
+
+reactionWheel_img = pygame.image.load("GUISprites/ReactionWheel.png").convert_alpha()
+
+L = 0.15 #m
+pixelscale = 1500 #px/m
+cubePointsRelative = np.array([[0,0], [L, 0], [L, -L], [0, -L]]) * pixelscale
+pivotPosition = np.array([1000, 590])
+initialCubeAngle = -45 #deg
+
+
+
+def rotationMatrix(angle):
+    angle = np.deg2rad(angle)
+    rotationMatrix = [[np.cos(angle), -np.sin(angle)],[np.sin(angle), np.cos(angle)]]
+    return rotationMatrix
+
+for i in range (0, len(cubePointsRelative)):
+    cubePointsRelative[i] = np.dot(rotationMatrix(initialCubeAngle), cubePointsRelative[i])
+
+
+
+running = True
+
+clock = pygame.time.Clock()
+
+delta_time = 0.1
+theta = np.deg2rad(0)
+
+simulate_time = 10
+dt = 0.001
+thetaInit_deg = 5
+delayTime = 10e-3
+
+Arr_timepoints, Arr_angles, Arr_wheelAngle = BD.simulate(simulate_time, dt, thetaInit_deg, delayTime)
+#time.sleep(5)
+bodyDyngraph_img = pygame.image.load("GUISprites/bodyDynamics.jpg").convert()
+bodyDyngraph_img = pygame.transform.scale(bodyDyngraph_img, (900, 450))
+
+print(Arr_angles[25])
+i = 0
+
+scW, scH = screen.get_size()
+
+
+while running:
+    cubePoints = np.copy(cubePointsRelative)
+    screen.fill((234, 226, 183))
+    theta = Arr_angles[i]
+    for j in range (0, len(cubePointsRelative)):
+        cubePoints[j] = np.dot(rotationMatrix(theta), cubePointsRelative[j]) + pivotPosition
+    wheelCentre = ((cubePoints[0] + cubePoints[2])/2)
+
+
+    wheelAngle_deg = np.rad2deg(Arr_wheelAngle[i])
+    rotatedWheel = pygame.transform.rotate(reactionWheel_img, -wheelAngle_deg)
+    wheelRect = rotatedWheel.get_rect(center=(float(wheelCentre[0]), float(wheelCentre[1])))
+
+    
+    screen.blit(bodyDyngraph_img, (0,0))
+    cubeface = pygame.draw.polygon(screen, (214, 40, 40), cubePoints)
+    screen.blit(rotatedWheel, wheelRect)
+    vertline = pygame.draw.line(screen, (0, 48, 73), (pivotPosition), (pivotPosition + (0, -2*L*pixelscale)))
+    ProgressBar = pygame.draw.polygon(screen, (252, 191, 73), ((0, scH), (0, scH - 50), ((i/len(Arr_timepoints))*scW, scH-50), ((i/len(Arr_timepoints))*scW, scH)))
+
+    
+
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    pygame.display.flip()
+
+    delta_time = clock.tick(24) / 1000
+    delta_time = max(0.001, min(0.1, delta_time))
+    i +=  int(0.5*delta_time / dt)
+    if i >= len(Arr_timepoints):
+        i = 0
+        print("loop")
+
+
+
+pygame.quit()
