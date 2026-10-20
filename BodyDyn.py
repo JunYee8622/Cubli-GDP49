@@ -75,17 +75,19 @@ def Grav_torque(TotalMassLever, theta, angledelta = 0):
 
 def dist_torque(t = 0, use = False):
     if use == True:
+        distMagnitude = 0.05
         #print("add disturbance torque functionality")
         '''t_impulse = [0.01, 0.2, 0.8, 4, 6 ] # seconds
         for t_i in t_impulse:
             if t == t_i:
                 return(-0.1) # Nm'''
-        if t < 6 and t > 5.8:
-            return(-0.05) # Nm
+        if t > 2 and t < 2.2:
+            return(distMagnitude)
+        if t > 4 and t < 4.2:
+            return(distMagnitude)
+
         else:
             return(0)
-    else:
-        return(0)
 
 ####
 #Control
@@ -117,7 +119,7 @@ m_leverTotal = TotalMassLever(x_dist, y_dist, m_total)
 
 
 
-def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 20e-3):
+def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 1e-3):
     theta = np.deg2rad(thetaInit_deg) # initial angle (degrees)
     theta_vel = 0 # initial angular velocity (rad/s)
     time = 0
@@ -134,7 +136,10 @@ def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 20e-
 
     
     
-    delayCycles = int(delayTime/dt) - 1 
+    delayCycles = int(delayTime/dt) - 1
+
+    if delayCycles <= 1:
+        delayCycles = 1
     
 
     Arr_thetaMeasured = []

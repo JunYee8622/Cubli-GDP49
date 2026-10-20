@@ -57,4 +57,6 @@ def delivered_torque(motorSpeed, current, MaxCurrentDriver, TorqueConstant = 36e
     else:
         return (RequestedTorque, False) #Ensure that continuous limits are respected outside of this file.
 
-#motor_characteristics(omegarpm=np.linspace(0, 1.2*NoLoadSpeed, 100), plot=True)
+
+if __name__ == "__main__":
+    motor_characteristics(omegarpm=np.linspace(0, 1.2*NoLoadSpeed, 100), plot=True)

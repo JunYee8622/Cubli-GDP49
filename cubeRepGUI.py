@@ -14,7 +14,7 @@ reactionWheel_img = pygame.image.load("GUISprites/ReactionWheel.png").convert_al
 L = 0.15 #m
 pixelscale = 1500 #px/m
 cubePointsRelative = np.array([[0,0], [L, 0], [L, -L], [0, -L]]) * pixelscale
-pivotPosition = np.array([1000, 590])
+pivotPosition = np.array([1050, 590])
 initialCubeAngle = -45 #deg
 
 
@@ -36,10 +36,10 @@ clock = pygame.time.Clock()
 delta_time = 0.1
 theta = np.deg2rad(0)
 
-simulate_time = 10
+simulate_time = 6
 dt = 0.001
 thetaInit_deg = 5
-delayTime = 10e-3
+delayTime = 1e-3
 
 Arr_timepoints, Arr_angles, Arr_wheelAngle = BD.simulate(simulate_time, dt, thetaInit_deg, delayTime)
 #time.sleep(5)
@@ -51,13 +51,14 @@ i = 0
 
 scW, scH = screen.get_size()
 
+angAmplVis = 4
 
 while running:
     cubePoints = np.copy(cubePointsRelative)
     screen.fill((234, 226, 183))
     theta = Arr_angles[i]
     for j in range (0, len(cubePointsRelative)):
-        cubePoints[j] = np.dot(rotationMatrix(theta), cubePointsRelative[j]) + pivotPosition
+        cubePoints[j] = np.dot(rotationMatrix(theta * angAmplVis), cubePointsRelative[j]) + pivotPosition
     wheelCentre = ((cubePoints[0] + cubePoints[2])/2)
 
 
@@ -81,7 +82,7 @@ while running:
 
     pygame.display.flip()
 
-    delta_time = clock.tick(24) / 1000
+    delta_time = clock.tick(60) / 1000
     delta_time = max(0.001, min(0.1, delta_time))
     i +=  int(0.5*delta_time / dt)
     if i >= len(Arr_timepoints):
