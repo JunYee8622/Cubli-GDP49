@@ -1,5 +1,6 @@
 import pygame
 import numpy as np
+import matplotlib
 import BodyDyn as BD
 import time
 
@@ -41,10 +42,40 @@ dt = 0.001
 thetaInit_deg = 5
 delayTime = 1e-3
 
-Arr_timepoints, Arr_angles, Arr_wheelAngle = BD.simulate(simulate_time, dt, thetaInit_deg, delayTime)
+'''here are what added my AI'''
+Arr_timepoints, Arr_angles, Arr_wheelAngle, Arr_wheelVels = BD.simulate(simulate_time, dt, thetaInit_deg, delayTime)
 #time.sleep(5)
 bodyDyngraph_img = pygame.image.load("GUISprites/bodyDynamics.jpg").convert()
-bodyDyngraph_img = pygame.transform.scale(bodyDyngraph_img, (900, 450))
+graphW, graphH = 900, 450
+bodyDyngraph_img = pygame.transform.scale(bodyDyngraph_img, (graphW, graphH))
+
+# Red dot on each graph: map (time, value) to pixels on the saved matplotlib figure.
+# The figure is saved with default subplot layout, so axes positions come from rcParams;
+# data limits are matplotlib's default 5 % margin around the plotted data.
+def makeGraphMapper(axIndex, yData):
+    p = matplotlib.rcParams
+    left, right, wspace = p["figure.subplot.left"], p["figure.subplot.right"], p["figure.subplot.wspace"]
+    bottom, top = p["figure.subplot.bottom"], p["figure.subplot.top"]
+    axW = (right - left) / (2 + wspace)
+    axLeft = left + axIndex * axW * (1 + wspace)
+    px0, px1 = axLeft * graphW, (axLeft + axW) * graphW
+    py0, py1 = (1 - bottom) * graphH, (1 - top) * graphH  # pixel y of axis bottom and top
+
+    tMin, tMax = Arr_timepoints[0], Arr_timepoints[-1]
+    yMin, yMax = min(yData), max(yData)
+    xLo, xHi = tMin - 0.05 * (tMax - tMin), tMax + 0.05 * (tMax - tMin)
+    yLo, yHi = yMin - 0.05 * (yMax - yMin), yMax + 0.05 * (yMax - yMin)
+
+    def toPixel(i):
+        x = px0 + (Arr_timepoints[i] - xLo) / (xHi - xLo) * (px1 - px0)
+        y = py0 + (yData[i] - yLo) / (yHi - yLo) * (py1 - py0)
+        return (int(x), int(y))
+    return toPixel
+
+angleDotPos = makeGraphMapper(0, Arr_angles)
+wheelDotPos = makeGraphMapper(1, Arr_wheelVels)
+'''until here '''
+
 
 print(Arr_angles[25])
 i = 0
@@ -68,6 +99,8 @@ while running:
 
     
     screen.blit(bodyDyngraph_img, (0,0))
+    pygame.draw.circle(screen, (255, 0, 0), angleDotPos(i), 5)
+    pygame.draw.circle(screen, (255, 0, 0), wheelDotPos(i), 5)
     cubeface = pygame.draw.polygon(screen, (214, 40, 40), cubePoints)
     screen.blit(rotatedWheel, wheelRect)
     vertline = pygame.draw.line(screen, (0, 48, 73), (pivotPosition), (pivotPosition + (0, -2*L*pixelscale)))

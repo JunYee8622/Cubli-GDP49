@@ -216,7 +216,7 @@ def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 1e-3
 
 
     
-    return(Arr_timepoints, Arr_angles, Arr_wheelAngle)
+    return(Arr_timepoints, Arr_angles, Arr_wheelAngle, WheelVels)
 
 if __name__ == "__main__":
     print(f"I_p: {Ip}")
