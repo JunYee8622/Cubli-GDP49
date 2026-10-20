@@ -21,6 +21,7 @@ imu_test_kit/
     ├── test_4_gyro_scale_roll.py     gyro scale factor from 90° rolls
     ├── test_5_return_to_start.py     filter returns to the same angle after motion
     ├── test_6_vibration.py           reaction-wheel vibration: noise vs speed, spectrogram
+    ├── visualise_graph.py            plot any log: accel, gyro, filter angles, temp, markers
     └── make_fake_data.py             simulated logs to dry-run every test now
 ```
 
