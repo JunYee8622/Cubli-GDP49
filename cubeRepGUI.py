@@ -40,10 +40,10 @@ theta = np.deg2rad(0)
 simulate_time = 6
 dt = 0.001
 thetaInit_deg = 5
-delayTime = 1e-3
+delayTime = 20e-3
 
 '''here are what added my AI'''
-Arr_timepoints, Arr_angles, Arr_wheelAngle, Arr_wheelVels = BD.simulate(simulate_time, dt, thetaInit_deg, delayTime)
+Arr_timepoints, Arr_angles, Arr_wheelAngle, Arr_wheelVels = BD.simulate(False, simulate_time, dt, thetaInit_deg, delayTime)
 #time.sleep(5)
 bodyDyngraph_img = pygame.image.load("GUISprites/bodyDynamics.jpg").convert()
 graphW, graphH = 900, 450

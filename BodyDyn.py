@@ -1,10 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-import tkinter as tk
-from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, 
-NavigationToolbar2Tk)
 import MotorDynamics as MD
+import ThermalChecks as TC
 
 
 
@@ -34,7 +32,6 @@ a_square = 0.15 # cube side length (m)
 
 
 
-max_motor_torque = 0.110 # Nm
 
 def angle_offset(x_dist, y_dist):
     angle_offset = np.arctan2(x_dist, y_dist)
@@ -75,19 +72,17 @@ def Grav_torque(TotalMassLever, theta, angledelta = 0):
 
 def dist_torque(t = 0, use = False):
     if use == True:
-        distMagnitude = 0.05
+        distMagnitude = 0.08
+        n = 2
         #print("add disturbance torque functionality")
         '''t_impulse = [0.01, 0.2, 0.8, 4, 6 ] # seconds
         for t_i in t_impulse:
             if t == t_i:
                 return(-0.1) # Nm'''
-        if t > 2 and t < 2.2:
-            return(distMagnitude)
-        if t > 4 and t < 4.2:
+        if t % n < 0.5:
             return(distMagnitude)
 
-        else:
-            return(0)
+    return(0)
 
 ####
 #Control
@@ -101,8 +96,8 @@ def pid_control(theta, theta_vel, WheelV, cumulative_error, Kp = 5, Ki = 0.01, K
     D_control = Kd * theta_vel  # Derivative term
     P2_control = Kp2 * WheelV  # Proportional term for wheel speed
     T_control = P_control + I_control + D_control + P2_control
-    if abs(T_control) > maxT:
-        T_control = np.sign(T_control) * maxT  # Limit the torque to the maximum motor torque
+    # if abs(T_control) > maxT:
+    #     T_control = np.sign(T_control) * maxT  # Limit the torque to the maximum motor torque
     return T_control
 
 
@@ -119,7 +114,7 @@ m_leverTotal = TotalMassLever(x_dist, y_dist, m_total)
 
 
 
-def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 1e-3):
+def simulate(sweep = False, simulate_time = 100, dt = 0.001, thetaInit_deg = 5, delayTime = 15e-3, Gains = (3.3, 0.001, 0.23, 0.001)):
     theta = np.deg2rad(thetaInit_deg) # initial angle (degrees)
     theta_vel = 0 # initial angular velocity (rad/s)
     time = 0
@@ -134,7 +129,8 @@ def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 1e-3
     cumulative_error = 0 # For integral control of wheel speed
     saturated = False
 
-    
+    K = 36e-3
+    max_motor_torque = 6 * K # Nm
     
     delayCycles = int(delayTime/dt) - 1
 
@@ -146,6 +142,12 @@ def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 1e-3
     Arr_thetaVelMeasured = []
     Arr_wheelVMeasured = []
     Arr_cumulativeError = []
+
+    Arr_windingTemp = []
+    Arr_housingTemp = []
+    Arr_DTM = []
+    Arr_Ilimit = []
+    Arr_Idrawn = []
     
     Arr_wheelAngle = []
 
@@ -155,9 +157,13 @@ def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 1e-3
         Arr_wheelVMeasured.append(WheelV)
         Arr_cumulativeError.append(cumulative_error)
 
-
+    thermILimit = 6 #A
+    DTM = 0
+    Twind = TC.celcius_to_kelvin(25) #winding initial temperature (cel)
+    Thous = Twind
+    Tamb = Twind
     while time < simulate_time and abs(np.rad2deg(theta)) < 45: # Stop if the cube falls over
-        K = 36e-3
+        
         T_grav = Grav_torque(m_leverTotal, theta, trueAngleDelta)
         T_dist = dist_torque(time, use = True)
         #T_wheel = 0
@@ -180,8 +186,9 @@ def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 1e-3
         Arr_timepoints.append(time)
         if saturated ==False:
             cumulative_error += WheelVRelative * dt # Update cumulative error for integral control - time multiplied in to allow for change in time step
-        else:
-            pass
+
+        #angleErrorSum += abs(theta - trueAngleDelta)
+
 
         theta_measured = theta + random.uniform(np.deg2rad(-0.1), np.deg2rad(0.1)) # Add noise to the angle measurement
         theta_vel_measured = theta_vel + random.uniform(np.deg2rad(-1), np.deg2rad(1)) # Add noise to the angular velocity measurement
@@ -194,35 +201,49 @@ def simulate(simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 1e-3
 
         Arr_angles.append(np.rad2deg(theta))
         Arr_wheelAngle.append(wheelAngle)
+        
+        T_demand = pid_control(Arr_thetaMeasured[-delayCycles], Arr_thetaVelMeasured[-delayCycles], Arr_wheelVMeasured[-delayCycles], Arr_cumulativeError[-delayCycles], Kp = Gains[0], Ki = Gains[1], Kd = Gains[2], Kp2 = Gains[3], maxT = max_motor_torque, use = True)
+        T_friction = MD.MotorFrictionTorque(60*WheelVRelative/(2*np.pi), useTanh=(True, 5))
+        T_wheel, saturated = MD.delivered_torque(60*WheelVRelative/(2*np.pi), T_demand/K, thermILimit, K)
+        '''Thermal Current limits'''
+        Idelivered = T_wheel / K
+        thermILimit, Twind, Thous, DTM = TC.thermal_sim(Idelivered, Twind, Thous, Tamb, dt, DTM)
 
-        T_demand = pid_control(Arr_thetaMeasured[-delayCycles], Arr_thetaVelMeasured[-delayCycles], Arr_wheelVMeasured[-delayCycles], Arr_cumulativeError[-delayCycles], Kp = 3.3, Ki = 0.001, Kd = 0.23, Kp2 = 0.001, maxT = max_motor_torque, use = True)
-        T_friction = MD.MotorFrictionTorque(60*WheelVRelative/(2*np.pi), useTanh=(True, 20))
-        T_wheel, saturated = MD.delivered_torque(60*WheelVRelative/(2*np.pi), T_demand/K, 6, K)
+        Arr_Ilimit.append(thermILimit)
+        Arr_windingTemp.append(Twind)
+        Arr_housingTemp.append(Thous)
+        Arr_DTM.append(DTM)
+        Arr_Idrawn.append(Idelivered)
+        ''''''
+        
         T_wheel += T_friction
         time += dt # Update time
         if saturated and __name__ == "__main__":
             print("motor saturated")
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    ax[0].plot(Arr_timepoints, Arr_angles); ax[0].set_title('Cube Angle vs Time'); ax[0].set_xlabel('Time (s)'); ax[0].set_ylabel('Angle (degrees)')
-    ax[1].plot(Arr_timepoints, WheelVels); ax[1].set_title('Wheel Velocity vs Time'); ax[1].set_xlabel('Time (s)'); ax[1].set_ylabel('Wheel Velocity (rpm)')
-    print(WheelVels[-100:len(WheelVels)-1])
+    #ax[0].plot(Arr_timepoints, Arr_angles); ax[0].set_title('Cube Angle vs Time'); ax[0].set_xlabel('Time (s)'); ax[0].set_ylabel('Angle (degrees)')
+    #ax[1].plot(Arr_timepoints, WheelVels); ax[1].set_title('Wheel Velocity vs Time'); ax[1].set_xlabel('Time (s)'); ax[1].set_ylabel('Wheel Velocity (rpm)')
+    #print(WheelVels[-100:len(WheelVels)-1])
     plt.savefig("GUISprites/bodyDynamics.jpg")
+    
     if __name__ == "__main__":
+        ax[0].plot(Arr_timepoints, Arr_windingTemp)
+        ax[1].plot(Arr_timepoints, Arr_Idrawn)
         print(f"trueAngleDelta: {np.rad2deg(trueAngleDelta)}")
         print(f"reading processing delayed by: {delayCycles} cycles ({delayCycles * dt } seconds)")
         plt.show()
         
 
 
-    
+    # if sweep:
+    #     return(angleErrorSum, Arr_angles, WheelVels)
     return(Arr_timepoints, Arr_angles, Arr_wheelAngle, WheelVels)
 
 if __name__ == "__main__":
     print(f"I_p: {Ip}")
     print(f"I_wheel: {I_wheel}")
     print(f"TotalMassLever: {m_leverTotal}")
-    print(f"motor torque max: {max_motor_torque}")
     simulate()
     
 
