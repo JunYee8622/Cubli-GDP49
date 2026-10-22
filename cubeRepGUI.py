@@ -37,13 +37,13 @@ clock = pygame.time.Clock()
 delta_time = 0.1
 theta = np.deg2rad(0)
 
-simulate_time = 6
+simulate_time = 10
 dt = 0.001
 thetaInit_deg = 5
-delayTime = 20e-3
+delayTime = 15e-3
 
 '''here are what added my AI'''
-Arr_timepoints, Arr_angles, Arr_wheelAngle, Arr_wheelVels = BD.simulate(False, simulate_time, dt, thetaInit_deg, delayTime)
+Arr_timepoints, Arr_angles, Arr_wheelAngle, Arr_wheelVels = BD.simulate(False, simulate_time, dt, thetaInit_deg, delayTime, Gains =(8.61817371e+00 ,2.47127648e-05 ,1.25690132e+00 ,1.35912411e-02))
 #time.sleep(5)
 bodyDyngraph_img = pygame.image.load("GUISprites/bodyDynamics.jpg").convert()
 graphW, graphH = 900, 450

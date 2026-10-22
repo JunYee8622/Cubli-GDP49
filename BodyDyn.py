@@ -6,6 +6,7 @@ import ThermalChecks as TC
 
 
 
+
 usePlastic = True
 if usePlastic:
     m_total = 0.32669
@@ -72,7 +73,7 @@ def Grav_torque(TotalMassLever, theta, angledelta = 0):
 
 def dist_torque(t = 0, use = False):
     if use == True:
-        distMagnitude = 0.08
+        distMagnitude = -0.08
         n = 2
         #print("add disturbance torque functionality")
         '''t_impulse = [0.01, 0.2, 0.8, 4, 6 ] # seconds
@@ -114,7 +115,8 @@ m_leverTotal = TotalMassLever(x_dist, y_dist, m_total)
 
 
 
-def simulate(sweep = False, simulate_time = 100, dt = 0.001, thetaInit_deg = 5, delayTime = 15e-3, Gains = (3.3, 0.001, 0.23, 0.001)):
+def simulate(sweep = False, simulate_time = 10, dt = 0.001, thetaInit_deg = 5, delayTime = 15e-3, Gains = (3.3, 0.001, 0.23, 0.001)):
+    random.seed(1005)
     theta = np.deg2rad(thetaInit_deg) # initial angle (degrees)
     theta_vel = 0 # initial angular velocity (rad/s)
     time = 0
@@ -148,6 +150,8 @@ def simulate(sweep = False, simulate_time = 100, dt = 0.001, thetaInit_deg = 5, 
     Arr_DTM = []
     Arr_Ilimit = []
     Arr_Idrawn = []
+
+    Arr_thetaError = []
     
     Arr_wheelAngle = []
 
@@ -156,6 +160,7 @@ def simulate(sweep = False, simulate_time = 100, dt = 0.001, thetaInit_deg = 5, 
         Arr_thetaVelMeasured.append(theta_vel)
         Arr_wheelVMeasured.append(WheelV)
         Arr_cumulativeError.append(cumulative_error)
+
 
     thermILimit = 6 #A
     DTM = 0
@@ -187,7 +192,6 @@ def simulate(sweep = False, simulate_time = 100, dt = 0.001, thetaInit_deg = 5, 
         if saturated ==False:
             cumulative_error += WheelVRelative * dt # Update cumulative error for integral control - time multiplied in to allow for change in time step
 
-        #angleErrorSum += abs(theta - trueAngleDelta)
 
 
         theta_measured = theta + random.uniform(np.deg2rad(-0.1), np.deg2rad(0.1)) # Add noise to the angle measurement
@@ -198,6 +202,7 @@ def simulate(sweep = False, simulate_time = 100, dt = 0.001, thetaInit_deg = 5, 
         Arr_thetaVelMeasured.append(theta_vel_measured)
         Arr_wheelVMeasured.append(WheelV_measured)
         Arr_cumulativeError.append(cumulative_error)
+        Arr_thetaError.append(abs(theta - np.deg2rad(trueAngleDelta)))
 
         Arr_angles.append(np.rad2deg(theta))
         Arr_wheelAngle.append(wheelAngle)
@@ -220,12 +225,12 @@ def simulate(sweep = False, simulate_time = 100, dt = 0.001, thetaInit_deg = 5, 
         time += dt # Update time
         if saturated and __name__ == "__main__":
             print("motor saturated")
-
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    #ax[0].plot(Arr_timepoints, Arr_angles); ax[0].set_title('Cube Angle vs Time'); ax[0].set_xlabel('Time (s)'); ax[0].set_ylabel('Angle (degrees)')
-    #ax[1].plot(Arr_timepoints, WheelVels); ax[1].set_title('Wheel Velocity vs Time'); ax[1].set_xlabel('Time (s)'); ax[1].set_ylabel('Wheel Velocity (rpm)')
-    #print(WheelVels[-100:len(WheelVels)-1])
-    plt.savefig("GUISprites/bodyDynamics.jpg")
+    if sweep == False:
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+        ax[0].plot(Arr_timepoints, Arr_angles); ax[0].set_title('Cube Angle vs Time'); ax[0].set_xlabel('Time (s)'); ax[0].set_ylabel('Angle (degrees)')
+        ax[1].plot(Arr_timepoints, WheelVels); ax[1].set_title('Wheel Velocity vs Time'); ax[1].set_xlabel('Time (s)'); ax[1].set_ylabel('Wheel Velocity (rpm)')
+        #print(WheelVels[-100:len(WheelVels)-1])
+        plt.savefig("GUISprites/bodyDynamics.jpg")
     
     if __name__ == "__main__":
         ax[0].plot(Arr_timepoints, Arr_windingTemp)
@@ -235,9 +240,6 @@ def simulate(sweep = False, simulate_time = 100, dt = 0.001, thetaInit_deg = 5, 
         plt.show()
         
 
-
-    # if sweep:
-    #     return(angleErrorSum, Arr_angles, WheelVels)
     return(Arr_timepoints, Arr_angles, Arr_wheelAngle, WheelVels)
 
 if __name__ == "__main__":
