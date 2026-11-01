@@ -2,9 +2,9 @@
 #pragma once
 
 // ---------------- Hardware ----------------
-#define I2C_SDA      21          // ESP32 default I2C pins (DevKit V1). Change for your board.
-#define I2C_SCL      22
-#define ICM_ADDR     0x69        // Adafruit ICM-20948 default. 0x68 if the AD0 jumper is bridged.
+#define I2C_SDA      47          // ESP32 default I2C pins (DevKit V1). Change for your board.
+#define I2C_SCL      21
+#define ICM_ADDR     0x68        // Adafruit ICM-20948 default. 0x68 if the AD0 jumper is bridged.
 
 // ---------------- Sampling ----------------
 #define LOOP_HZ      500         // fixed loop rate. Overruns are reported as "# overruns=N" lines.
@@ -25,9 +25,9 @@
 // Paste the values printed by test_1_accel_calibration.py and test_2_gyro_still.py.
 // calibrated_acc = (raw_acc - ACC_OFFSET) / ACC_SCALE      [m/s^2]
 // calibrated_gyro = raw_gyro - GYRO_BIAS                    [deg/s]
-static const float ACC_OFFSET[3] = {0.0f, 0.0f, 0.0f};
-static const float ACC_SCALE[3]  = {1.0f, 1.0f, 1.0f};
-static const float GYRO_BIAS[3]  = {0.0f, 0.0f, 0.0f};
+static const float ACC_OFFSET[3] = {0.00000f, 0.00000f, 0.00000f};
+static const float ACC_SCALE[3]  = {1.00000f, 1.00000f, 1.00000f};
+static const float GYRO_BIAS[3]  = {-1.02486f, 0.12553f, 0.44382f};
 
 // ---------------- Filter tuning (start values) ----------------
 #define COMP_ALPHA   0.98f       // complementary: closer to 1 = trust gyro more
