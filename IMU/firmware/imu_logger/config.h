@@ -34,3 +34,11 @@ static const float GYRO_BIAS[3]  = {-1.02486f, 0.12553f, 0.44382f};
 #define KF_Q_ANGLE   0.001f      // Kalman: distrust of gyro prediction
 #define KF_Q_BIAS    0.003f      // Kalman: how fast gyro bias may wander
 #define KF_R_MEAS    0.03f       // Kalman: accelerometer angle noise (deg^2)
+
+#define MOTOR_PWM_PIN        6     // DI1_M3
+#define MOTOR_EN_PIN         5     // DI2_M3
+#define ESC_SPEED_ADC_PIN    7     // AO1_M3
+
+#define ESC_ADC_GAIN         1.0f
+#define ESC_ADC_OFFSET_V     1.6f
+#define ESC_SPEED_RPM_PER_V  5714.0f

@@ -46,8 +46,10 @@ def main():
 
     n, t0 = 0, time.time()
     print(f"logging to {path}  (Enter = marker, Ctrl+C = stop)")
+    # Column names come from the board's own "t_us,..." header line, so firmware that adds
+    # columns (e.g. motor telemetry) still logs. Falls back to the IMU-only HEADER.
+    cols = None
     with open(path, "w") as f:
-        f.write(",".join(HEADER) + "\n")
         try:
             while args.seconds == 0 or time.time() - t0 < args.seconds:
                 line = ser.readline().decode(errors="ignore").strip()
@@ -56,8 +58,18 @@ def main():
                 if line.startswith("#"):
                     print(line)  # status / overrun messages from the board
                     continue
-                if line.count(",") != len(HEADER) - 1 or line.startswith("t_us"):
-                    continue  # header or a partial line from the reset
+                if line.startswith("t_us"):
+                    if cols is None:
+                        cols = line.split(",")
+                        f.write(line + "\n")
+                    continue
+                if cols is None:
+                    if line.count(",") != len(HEADER) - 1:
+                        continue  # header not seen yet and not the IMU-only format
+                    cols = HEADER
+                    f.write(",".join(HEADER) + "\n")
+                if line.count(",") != len(cols) - 1:
+                    continue  # partial line from the reset
                 f.write(line + "\n")
                 n += 1
                 if n % 2500 == 0:
