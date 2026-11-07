@@ -11,9 +11,9 @@ Usage:
 
 While running, type in this window and press Enter:
     (just Enter)   insert a marker (increments the 'marker' column on the ESP32)
-    c 0.2          motor current command 0.2 A, and enable (clamped on the ESP32)
-    c -0.2         reverse
-    x              stop: 0 A and disable
+    g              start the motor speed-test profile (speed-test firmware)
+    c 0.2          motor current command 0.2 A, and enable (current-command firmware)
+    x              stop the motor
     Ctrl+C         stop logging and save (also sends 'x'), or close the plot window
 
 All display work happens on the laptop, so it never slows the ESP32. The CSV contains every row
@@ -33,12 +33,18 @@ import time
 
 CLEAR_LINE = "\r\x1b[2K"
 print_lock = threading.Lock()
+live = {"drawn": False}   # True while the two live lines are on screen (cursor on line 1)
 
 
 def out(text):
-    """Print a normal line above the live readout line."""
+    """Print a normal message above the two live readout lines."""
     with print_lock:
-        sys.stdout.write(CLEAR_LINE + text + "\n")
+        if live["drawn"]:
+            sys.stdout.write("\r\x1b[2K\x1b[1B\x1b[2K\x1b[1A")   # clear both live lines
+        else:
+            sys.stdout.write(CLEAR_LINE)
+        sys.stdout.write(text + "\n")
+        live["drawn"] = False   # the next redraw starts on this fresh line
         sys.stdout.flush()
 
 
@@ -79,7 +85,8 @@ def main():
     lock = threading.Lock()
     plot_buf = collections.deque(maxlen=max(100, int(args.window * 1000)))  # room for up to 1 kHz
     st = {"rows": 0, "missed": 0, "markers": 0, "latest": None, "last_rx": 0.0,
-          "ovr": None, "status_rest": None, "cols": None, "idx": {}}
+          "ovr": None, "status_rest": None, "cols": None, "idx": {},
+          "status": None, "status_t": 0.0, "ovr_rate": None, "ovr_prev": None}
 
     def send(msg):
         try:
@@ -106,6 +113,8 @@ def main():
                 out(f"# marker {st['markers']} sent")
             elif cmd.lower() in ("x", "s", "stop"):
                 send(b"x")
+            elif cmd.lower() in ("g", "go", "start"):
+                send(b"g")
             elif cmd.lower().startswith("c"):
                 try:
                     amps = float(cmd[1:].strip())
@@ -114,23 +123,28 @@ def main():
                     continue
                 send(f"c {amps:.4f}".encode())
             else:
-                out("# commands: Enter = marker | c <amps> = motor current | x = stop")
+                send(cmd.encode())                  # forward a, z, +, -, p ...
+                out(f"# sent '{cmd}'")
 
     f = open(out_path, "w", newline="")
     st["rows_pending"] = []                     # rows received before the header
 
     def handle_status(line):
-        # Line looks like: "# overruns=102  wifi=connected ip=... udp=streaming  hall_err=0"
+        # Line looks like: "# overruns=102  wifi=connected ip=...  udp=streaming  loop_us avg=..."
         first, _, rest = line[2:].partition(" ")
         try:
             ovr = int(first.split("=")[1])
         except (IndexError, ValueError):
             out(line)
             return
-        changed = (ovr != st["ovr"]) or (rest != st["status_rest"])
+        now = time.time()
+        if st["ovr_prev"] is not None and now > st["ovr_prev"][1]:
+            st["ovr_rate"] = max(0.0, (ovr - st["ovr_prev"][0]) / (now - st["ovr_prev"][1]))
+        st["ovr_prev"] = (ovr, now)
         st["ovr"] = ovr
-        st["status_rest"] = rest
-        if changed:
+        st["status_rest"] = rest.strip()
+        st["status_t"] = now
+        if args.show > 0:            # no live lines in --show mode: print it as a message
             out(line)
 
     def receiver():
@@ -230,26 +244,52 @@ def main():
                 rate = (st["rows"] - rows_prev) / (now - t_prev)
                 rows_prev, t_prev = st["rows"], now
 
+            # ---- line 2: latest ESP32 status report (sent every 5 s), updated in place ----
+            if st["ovr"] is None:
+                line2 = "status: waiting for the first ESP32 report (sent every 5 s)"
+            else:
+                orate = st["ovr_rate"]
+                rate_txt = "" if orate is None else f" (+{orate:.0f}/s)"
+                warn = "  <-- LOOP TOO SLOW" if orate is not None and orate > 1 else ""
+                # Fields are separated by two spaces. Show motor/speed first, then loop timing,
+                # then the rest (wifi), so a narrow terminal cuts off the least useful part.
+                fields = [x.strip() for x in st["status_rest"].split("  ") if x.strip()]
+                def prio(x):
+                    if x.startswith(("motor", "rpm", "speed", "SPEED", "IMU")):
+                        return 0
+                    return 1 if x.startswith("loop_us") else 2
+                rest = " | ".join(sorted(fields, key=prio))
+                line2 = (f"status {now - st['status_t']:3.0f}s ago | overruns {st['ovr']}{rate_txt}{warn}"
+                         f" | {rest}")
+
             r = st["latest"]
             if r is None or now - st["last_rx"] > 2.0:
                 text = "waiting for data... (same hotspot? ESP32 powered? IMU found? firewall allowed?)"
             else:
                 ix = st["idx"]
                 parts = [f"comp {r[ix['ang_comp']]:+7.2f}°  kf {r[ix['ang_kf']]:+7.2f}°"]
-                if "cmd_A" in ix:
-                    en = "ON " if r[ix["en"]] > 0.5 else "off"
-                    ready = {1: "rdy", 0: "FAULT"}.get(int(r[ix["ready"]]), "")
-                    parts.append(f"motor {en} cmd {r[ix['cmd_A']]:+5.2f}A  I {r[ix['esc_A']]:+5.2f}A  "
-                                 f"hall {r[ix['hall_rpm']]:+6.0f}  esc {r[ix['esc_rpm']]:+6.0f} rpm {ready}")
+                if "en" in ix:
+                    m = ["motor " + ("ON " if r[ix["en"]] > 0.5 else "off")]
+                    for name, label, spec in (("ref_rpm", "ref", "+6.0f"), ("rpm", "rpm", "+6.0f"),
+                                              ("cmd_A", "cmd", "+5.2f"), ("esc_A", "I", "+5.2f"),
+                                              ("hall_rpm", "hall", "+6.0f"), ("esc_rpm", "esc", "+6.0f")):
+                        if name in ix:
+                            m.append(f"{label} {r[ix[name]]:{spec}}")
+                    if "ready" in ix:
+                        m.append({1: "rdy", 0: "FAULT"}.get(int(r[ix["ready"]]), ""))
+                    parts.append("  ".join(x for x in m if x))
                 parts.append(f"gyro {r[ix['gx']]:+7.1f} {r[ix['gy']]:+7.1f} {r[ix['gz']]:+7.1f} °/s")
-                ovr = st["ovr"] if st["ovr"] is not None else "-"
-                parts.append(f"{rate:4.0f} Hz  miss {st['missed']}  ovr {ovr}  m{int(r[ix['marker']])}")
+                parts.append(f"{rate:4.0f} Hz  miss {st['missed']}  m{int(r[ix['marker']])}")
                 parts.append(f"acc {r[ix['ax']]:+6.2f} {r[ix['ay']]:+6.2f} {r[ix['az']]:+6.2f}")
                 parts.append(f"t {r[0] * 1e-6:8.2f}s")
                 text = " | ".join(parts)
             width = shutil.get_terminal_size((120, 20)).columns - 1
             with print_lock:
-                sys.stdout.write(CLEAR_LINE + text[:width])
+                if stop.is_set():
+                    return
+                # line 1, newline, line 2, then back up to the start of line 1
+                sys.stdout.write(CLEAR_LINE + text[:width] + "\n\x1b[2K" + line2[:width] + "\x1b[1A\r")
+                live["drawn"] = True
                 sys.stdout.flush()
 
     threading.Thread(target=hello_loop, daemon=True).start()
@@ -259,7 +299,7 @@ def main():
     if args.show == 0:
         threading.Thread(target=display_loop, daemon=True).start()
 
-    out(f"# Saving to {out_path}.  Enter = marker | c <amps> = motor current | x = stop | Ctrl+C = quit")
+    out(f"# Saving to {out_path}.  Enter = marker | g = start | x = stop | Ctrl+C = quit")
 
     try:
         if args.plot:
@@ -303,7 +343,7 @@ def run_plot(plot_buf, lock, window_s, stop, st):
 
     panels = [("tilt [deg]", ["ang_comp", "ang_kf"]),
               ("gyro raw [deg/s]", ["gx", "gy", "gz"]),
-              ("wheel speed [rpm]", ["hall_rpm", "esc_rpm"]),
+              ("wheel speed [rpm]", ["ref_rpm", "rpm", "hall_rpm", "esc_rpm"]),
               ("motor current [A]", ["cmd_A", "esc_A"])]
     panels = [(label, [c for c in cols if c in idx]) for label, cols in panels]
     panels = [(label, cols) for label, cols in panels if cols]
@@ -342,8 +382,10 @@ def run_plot(plot_buf, lock, window_s, stop, st):
         axes[0].set_xlim(-window_s, 0)
         last = rows[-1]
         txt = f"ang_kf {last[idx['ang_kf']]:+.2f}°   marker {int(last[idx['marker']])}"
-        if "cmd_A" in idx:
-            txt += f"   cmd {last[idx['cmd_A']]:+.2f} A   hall {last[idx['hall_rpm']]:+.0f} rpm"
+        for name, label, spec, unit in (("ref_rpm", "ref", "+.0f", " rpm"), ("rpm", "rpm", "+.0f", ""),
+                                        ("cmd_A", "cmd", "+.2f", " A"), ("hall_rpm", "hall", "+.0f", " rpm")):
+            if name in idx:
+                txt += f"   {label} {last[idx[name]]:{spec}}{unit}"
         title.set_text(txt)
 
     anim = FuncAnimation(fig, update, interval=40, cache_frame_data=False)  # ~25 fps redraw

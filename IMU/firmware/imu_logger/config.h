@@ -19,14 +19,14 @@
 // ---------------- 1D tilt axis ----------------
 // 0 = rotation about IMU X  -> accel angle = atan2(ay, az), rate = gx
 // 1 = rotation about IMU Y  -> accel angle = atan2(-ax, az), rate = gy
-#define TILT_AXIS    0
+#define TILT_AXIS    1
 
 // ---------------- Calibration ----------------
 // Paste the values printed by test_1_accel_calibration.py and test_2_gyro_still.py.
 // calibrated_acc = (raw_acc - ACC_OFFSET) / ACC_SCALE      [m/s^2]
 // calibrated_gyro = raw_gyro - GYRO_BIAS                    [deg/s]
-static const float ACC_OFFSET[3] = {0.00000f, 0.00000f, 0.00000f};
-static const float ACC_SCALE[3]  = {1.00000f, 1.00000f, 1.00000f};
+static const float ACC_OFFSET[3] = {-0.04315f, -0.22845f, 0.20643f}; 
+static const float ACC_SCALE[3]  = {1.00190f, 1.00292f, 1.00528f};
 static const float GYRO_BIAS[3]  = {-1.02486f, 0.12553f, 0.44382f};
 
 // ---------------- Filter tuning (start values) ----------------
