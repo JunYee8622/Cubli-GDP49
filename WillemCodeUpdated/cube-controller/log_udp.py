@@ -199,6 +199,12 @@ def main():
                 if not line:
                     continue
                 if line.startswith("#"):
+                    if line.startswith("# BUSY"):
+                        # The ESP32 repeats this while another window holds the stream; show it only once
+                        if not st.get("busy_shown"):
+                            st["busy_shown"] = True
+                            out(line)
+                        continue
                     out(line)
                     continue
                 if line.startswith("t_us"):

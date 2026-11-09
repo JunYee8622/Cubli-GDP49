@@ -11,6 +11,10 @@
 // The ESCON only sees a valid PWM signal on its own slot's pins; a different slot shows a blinking red LED.
 #define MOTOR_SLOT 1
 
+// Wheel speed limit (rpm). Above this, any torque that would speed the wheel up further is set to zero; torque that
+// slows it down is still allowed.
+#define MAX_WHEEL_RPM 3000
+
 // Toggle between use of nonlinear or linear controller (0 = linear, 1 = nonlinear)
 #define USE_NONLINEAR_CONTROLLER 1
 
@@ -106,6 +110,9 @@ bool flag_terminate = false;
 
 // Remote stop from log_udp.py ("x"): motor torque is forced to zero until a remote "g" (go) is received
 bool flag_remote_stop = false;
+
+// True while the wheel speed limit (MAX_WHEEL_RPM) is cutting the torque
+bool flag_rpm_limit = false;
 
 // Torques
 float tau_1 = 0, tau_2 = 0, tau_3 = 0;
@@ -237,9 +244,9 @@ void loop() {
       uint16_t sender_port = udp.remotePort();
       bool same = (sender_ip == peer_ip && sender_port == peer_port);
       if(active && !same) {
-        // Tell the other window why it gets no data (at most once per second)
+        // Tell the other window why it gets no data (at most once every 5 seconds)
         static uint32_t busy_last = 0;
-        if(millis() - busy_last >= 1000) {
+        if(millis() - busy_last >= 5000) {
           busy_last = millis();
           char busy[128];
           int bn = snprintf(busy, sizeof(busy), "# BUSY: already streaming to %s:%u. Close the other log_udp.py first.\n",
@@ -285,8 +292,8 @@ void loop() {
     if(millis() - status_last_sent >= 5000) {
       status_last_sent = millis();
       char status[96];
-      int n = snprintf(status, sizeof(status), "# motor1=slot M%d armed=%d halted=%d stopped=%d wifi_rssi=%d\n", MOTOR_SLOT,
-        flag_arm, flag_terminate, flag_remote_stop, WiFi.RSSI());
+      int n = snprintf(status, sizeof(status), "# motor1=slot M%d armed=%d halted=%d stopped=%d rpm_limit=%d wifi_rssi=%d\n",
+        MOTOR_SLOT, flag_arm, flag_terminate, flag_remote_stop, flag_rpm_limit, WiFi.RSSI());
       udp_send(status, n);
     }
 
@@ -361,6 +368,14 @@ void controller() {
       flag_arm = false;
       flag_terminate = true;
     }
+  }
+
+  // Wheel speed limit: if the wheel is faster than MAX_WHEEL_RPM, do not apply torque that speeds it up even more
+  // (positive torque speeds up a positive speed, see the wheel estimator). Braking torque is still allowed.
+  float rpm_1 = whe_est_1.omega_w * 30.0 / pi;
+  flag_rpm_limit = (abs(rpm_1) > MAX_WHEEL_RPM) && (tau_1 * rpm_1 > 0.0);
+  if(flag_rpm_limit) {
+    tau_1 = 0.0;
   }
 
   // Apply torques to motors

@@ -67,8 +67,8 @@ const float ldw = 150; // How much do you trust the hall sensor compared to the 
 // Controller gains. These must be re-tuned if your cube has different dynamics (weights, inertias, dimensions, etc.)
 const float kp = 3.3;
 const float kd = 0.001;
-const float kpw = 0.23;
-const float kdw = 0.001;
+const float kpw = 0.5;
+const float kdw = 0.23;
 
 // One out of three of the following initial reference quaternions should be uncommented
 // Quaternion reference (Cubli sitting on on corner, corrected for center of mass misalignment)
