@@ -65,10 +65,10 @@ const float lds = 1; // How much do you trust the accelerometer compared to the 
 const float ldw = 150; // How much do you trust the hall sensor compared to the wheel model? This gain determines that.
 
 // Controller gains. These must be re-tuned if your cube has different dynamics (weights, inertias, dimensions, etc.)
-const float kp = 3.3;
-const float kd = 0.001;
-const float kpw = 0.5;
-const float kdw = 0.23;
+const float kp = 400;
+const float kd = 52.46;
+const float kpw = 2.661e-06;
+const float kdw = 0.08642;
 
 // One out of three of the following initial reference quaternions should be uncommented
 // Quaternion reference (Cubli sitting on on corner, corrected for center of mass misalignment)
@@ -80,7 +80,7 @@ const float kdw = 0.23;
 // const float qu3 =  0.0;
 
 // Quaternion reference (Cubli sitting on x axis edge, corrected for center of mass misalignment)
-const float phi_e = -3.0 * pi / 180.0;
+const float phi_e = 0.0 * pi / 180.0;
 const float qu0 = cos(phi_e / 2.0 - pi / 8.0);
 const float qu1 = cos(phi_e / 2.0 + 3.0 * pi / 8.0);
 const float qu2 = 0.0;
@@ -106,7 +106,7 @@ const float qu2_qu3 = qu2 * qu3;
 const float qu3_qu3 = qu3 * qu3;
 
 // Minimum and maximum error limits (for control safety)
-const float phi_min = 5.0 * pi / 180.0;
+const float phi_min = 2.5 * pi / 180.0;
 const float phi_max = 40.0 * pi / 180.0;
 
 // Minimum jerk trajectory parameters
