@@ -34,7 +34,7 @@ const float b = 0.0;
 const float Ra = 0.942; // Armature (winding) resistance (Ohm)
 const float La = 0.363e-3; // Armature (winding) inductance (H)
 const float Km = 36e-3; // Torque constant (Nm/A)
-const float ia_max = 6; // Maximum current (A)
+const float ia_max = 2; // Maximum current (A)
 const float omega_nl = 6250 * pi / 30; // No load speed (rad/s)
 
 // Mechanical motor properties
@@ -65,10 +65,10 @@ const float lds = 1; // How much do you trust the accelerometer compared to the 
 const float ldw = 150; // How much do you trust the hall sensor compared to the wheel model? This gain determines that.
 
 // Controller gains. These must be re-tuned if your cube has different dynamics (weights, inertias, dimensions, etc.)
-const float kp = 300;
-const float kd = 40;
-const float kpw = 0.009;
-const float kdw = 0.02;
+const float kp = 3.3;
+const float kd = 0.001;
+const float kpw = 0.23;
+const float kdw = 0.001;
 
 // One out of three of the following initial reference quaternions should be uncommented
 // Quaternion reference (Cubli sitting on on corner, corrected for center of mass misalignment)

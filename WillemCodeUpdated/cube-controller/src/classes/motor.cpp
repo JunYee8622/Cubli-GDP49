@@ -4,18 +4,15 @@
 Motor::Motor(int pin_enable, int pin_current) : pin_enable(pin_enable), pin_current(pin_current) {
     // Configure enable pin as digital output
     pinMode(pin_enable, OUTPUT);
+}
 
-    // Map pin number to channel (these must be updated if mx_current in pins.h is changed...)
-    if(pin_current == 12) {
-        channel = 0;
-    } else if(pin_current == 18) {
-        channel = 1;
-    } else {
-        channel = 2;
-    }
+void Motor::begin() {
+    // Configure current pin as 800 Hz 12-bit PWM output
+    ledcAttach(pin_current, 800, 12);
 
-    // Configure current pin as 1 kHz 12-bit PWM output
-    ledcAttach(pin_current, 1000, 12);
+    // Immediately output the neutral 50 % duty (0 A, driver disabled). Without this the pin sits at 0 % duty, which
+    // the ESCON flags as "PWM set value input out of range" (red LED blinking).
+    set_current(0);
 }
 
 void Motor::init() {
@@ -46,10 +43,10 @@ void Motor::set_current(float ia) {
         // configured accordingly.
         if(ia > ia_max) {
             // Saturation at upper limit
-            current = 0.9;
+            current = 0.89;
         } else if (ia < -ia_max) {
             // Saturation at lower limit
-            current = 0.1;
+            current = 0.11;
         } else {
             // Interpolation in valid range
             current = 0.5 + ia * (0.8 / (2.0 * ia_max));
@@ -58,9 +55,10 @@ void Motor::set_current(float ia) {
     // Set enable pin
     digitalWrite(pin_enable, enable);
 
-    // Map 0-1 PWM value to 12-bit range (0-4095) and write duty
+    // Map 0-1 PWM value to 12-bit range (0-4095) and write duty. On Arduino-ESP32 core 3.x ledcWrite() takes the pin
+    // number (not a channel number).
     uint32_t duty = current * 4095;
-    ledcWrite(channel, duty);
+    ledcWrite(pin_current, duty);
 }
 
 void Motor::set_torque(float tau) {
