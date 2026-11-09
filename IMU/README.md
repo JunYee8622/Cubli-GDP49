@@ -36,6 +36,9 @@ imu_test_kit/
 
 **Python.** `pip install numpy matplotlib pyserial`, then run everything from `python/`.
 
+**MATLAB.** Prefer MATLAB? `MATLAB/` is a full port of `python/` (same tests, same
+`calibration.json`). Run `run_fake_demo` from inside it; see `MATLAB/README.md`.
+
 ## Dry run now (no IMU needed)
 
 ```
