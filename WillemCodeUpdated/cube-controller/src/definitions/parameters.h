@@ -65,7 +65,7 @@ const float lds = 1; // How much do you trust the accelerometer compared to the 
 const float ldw = 150; // How much do you trust the hall sensor compared to the wheel model? This gain determines that.
 
 // Controller gains. These must be re-tuned if your cube has different dynamics (weights, inertias, dimensions, etc.)
-const float kp = 400;
+const float kp = 415;
 const float kd = 52.46;
 const float kpw = 2.661e-06;
 const float kdw = 0.08642;
