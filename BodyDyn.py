@@ -9,14 +9,16 @@ import ThermalChecks as TC
 
 usePlastic = True
 if usePlastic:
-    m_total = 0.32669
-    x_dist = 2.61e-3
-    y_dist = 108.12e-3
-    m_wheel = 0.03582
-    I_wheel = 75889.50e-9
-    #I_wheel = 38127.85e-9 ADD I ROTOR
-    #Ip =  4175714.14e-9 - I_wheel
-    Ip = 5068286.99e-9 - I_wheel
+    m_total = 0.40063
+    x_dist = 0
+    y_dist = 82.38e-3
+    rotorInertia = 1350e-9
+    mHub = 8.99e-3
+    IHub = 184.69e-9
+    m_wheel = 0.23134 + mHub
+    I_wheel =  248743.74e-9 + IHub + rotorInertia
+    print(I_wheel)
+    Ip = 7371343.37e-9 - I_wheel                # INCLUDE I wheel?
 else:
     m_total = 0.53079 # kg  total mass
     x_dist = 0.76e-3 # m  distance from pivot to cube centre of mass
@@ -71,16 +73,18 @@ def Grav_torque(TotalMassLever, theta, angledelta = 0):
     T_grav = (TotalMassLever) *g * np.sin(theta-angledelta) #Torque due to gravity on the cube
     return(T_grav)
 
-def dist_torque(t = 0, use = False):
+def dist_torque(dt, t = 0, use = False):
     if use == True:
-        distMagnitude = -0.08
+        if t < 2 * dt:
+            return(0)
+        distMagnitude = -10
         n = 2
         #print("add disturbance torque functionality")
         '''t_impulse = [0.01, 0.2, 0.8, 4, 6 ] # seconds
         for t_i in t_impulse:
             if t == t_i:
                 return(-0.1) # Nm'''
-        if t % n < 0.5:
+        if t % n < dt:
             return(distMagnitude)
 
     return(0)
@@ -150,6 +154,7 @@ def simulate(sweep = False, simulate_time = 10, dt = 0.001, thetaInit_deg = 5, d
     Arr_DTM = []
     Arr_Ilimit = []
     Arr_Idrawn = []
+    CubeVels = []
 
     Arr_thetaError = []
     
@@ -167,10 +172,11 @@ def simulate(sweep = False, simulate_time = 10, dt = 0.001, thetaInit_deg = 5, d
     Twind = TC.celcius_to_kelvin(25) #winding initial temperature (cel)
     Thous = Twind
     Tamb = Twind
+
     while time < simulate_time and abs(np.rad2deg(theta)) < 45: # Stop if the cube falls over
         
         T_grav = Grav_torque(m_leverTotal, theta, trueAngleDelta)
-        T_dist = dist_torque(time, use = True)
+        T_dist = dist_torque(dt, time, use = True)
         #T_wheel = 0
         
         wheel_angular_acceleration = wheel_AAc(T_wheel, I_wheel)
@@ -184,32 +190,35 @@ def simulate(sweep = False, simulate_time = 10, dt = 0.001, thetaInit_deg = 5, d
         theta_vel += body_angular_acceleration * dt # Update angular velocity based on angular acceleration
         theta += theta_vel * dt # Update angle based on angular velocity
         
-        WheelVRelative = WheelV - theta_vel #relative velocity required for motor torque and wheel V measurements
-        WheelVels.append(60*WheelVRelative/(2*np.pi)) #angular velocity in rpm
+        #WheelVRelative = WheelV - theta_vel #relative velocity required for motor torque and wheel V measurements
+        #WheelVels.append(60*WheelVRelative/(2*np.pi)) #angular velocity in rpm
+        WheelVels.append(60*WheelV/(2*np.pi))
+        CubeVels.append(60* theta_vel/(2*np.pi))
 
         
         Arr_timepoints.append(time)
-        if saturated ==False:
-            cumulative_error += WheelVRelative * dt # Update cumulative error for integral control - time multiplied in to allow for change in time step
+        if saturated ==False:   #yvgtubhinjok
+           cumulative_error += WheelV * dt # Update cumulative error for integral control - time multiplied in to allow for change in time step
 
 
 
         theta_measured = theta + random.uniform(np.deg2rad(-0.1), np.deg2rad(0.1)) # Add noise to the angle measurement
         theta_vel_measured = theta_vel + random.uniform(np.deg2rad(-1), np.deg2rad(1)) # Add noise to the angular velocity measurement
-        WheelV_measured = WheelVRelative + random.uniform(np.deg2rad(-1), np.deg2rad(1)) # Add noise to the wheel velocity measurement
+        WheelV_measured = WheelV + random.uniform(np.deg2rad(-1), np.deg2rad(1)) # Add noise to the wheel velocity measurement
+                        #changed from relative
 
         Arr_thetaMeasured.append(theta_measured)
         Arr_thetaVelMeasured.append(theta_vel_measured)
         Arr_wheelVMeasured.append(WheelV_measured)
         Arr_cumulativeError.append(cumulative_error)
-        Arr_thetaError.append(abs(theta - np.deg2rad(trueAngleDelta)))
+        Arr_thetaError.append(abs(theta - trueAngleDelta))
 
         Arr_angles.append(np.rad2deg(theta))
         Arr_wheelAngle.append(wheelAngle)
         
         T_demand = pid_control(Arr_thetaMeasured[-delayCycles], Arr_thetaVelMeasured[-delayCycles], Arr_wheelVMeasured[-delayCycles], Arr_cumulativeError[-delayCycles], Kp = Gains[0], Ki = Gains[1], Kd = Gains[2], Kp2 = Gains[3], maxT = max_motor_torque, use = True)
-        T_friction = MD.MotorFrictionTorque(60*WheelVRelative/(2*np.pi), useTanh=(True, 5))
-        T_wheel, saturated = MD.delivered_torque(60*WheelVRelative/(2*np.pi), T_demand/K, thermILimit, K)
+        T_friction = MD.MotorFrictionTorque(60*WheelV/(2*np.pi), useTanh=(True, 2))  #gnaehgb
+        T_wheel, saturated = MD.delivered_torque(60*WheelV/(2*np.pi), T_demand/K, thermILimit, K)    #huarhiaelg
         '''Thermal Current limits'''
         Idelivered = T_wheel / K
         thermILimit, Twind, Thous, DTM = TC.thermal_sim(Idelivered, Twind, Thous, Tamb, dt, DTM)
@@ -226,21 +235,22 @@ def simulate(sweep = False, simulate_time = 10, dt = 0.001, thetaInit_deg = 5, d
         if saturated and __name__ == "__main__":
             print("motor saturated")
     if sweep == False:
-        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+        fig, ax = plt.subplots(1, 3, figsize=(10, 5))
         ax[0].plot(Arr_timepoints, Arr_angles); ax[0].set_title('Cube Angle vs Time'); ax[0].set_xlabel('Time (s)'); ax[0].set_ylabel('Angle (degrees)')
         ax[1].plot(Arr_timepoints, WheelVels); ax[1].set_title('Wheel Velocity vs Time'); ax[1].set_xlabel('Time (s)'); ax[1].set_ylabel('Wheel Velocity (rpm)')
+        ax[2].plot(Arr_timepoints, CubeVels); ax[2].set_title('Cube Velocity ang')
         #print(WheelVels[-100:len(WheelVels)-1])
         plt.savefig("GUISprites/bodyDynamics.jpg")
     
     if __name__ == "__main__":
-        ax[0].plot(Arr_timepoints, Arr_windingTemp)
-        ax[1].plot(Arr_timepoints, Arr_Idrawn)
+        #ax[0].plot(Arr_timepoints, Arr_windingTemp)
+        #ax[1].plot(Arr_timepoints, Arr_Idrawn)
         print(f"trueAngleDelta: {np.rad2deg(trueAngleDelta)}")
         print(f"reading processing delayed by: {delayCycles} cycles ({delayCycles * dt } seconds)")
         plt.show()
         
 
-    return(Arr_timepoints, Arr_angles, Arr_wheelAngle, WheelVels)
+    return(Arr_timepoints, Arr_angles , Arr_wheelAngle, WheelVels)
 
 if __name__ == "__main__":
     print(f"I_p: {Ip}")

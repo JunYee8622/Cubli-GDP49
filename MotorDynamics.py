@@ -11,11 +11,12 @@ v_in = 24 #V
 '''
 def MotorFrictionTorque(wheelSpeedrpm, noLoadI = 238e-3, K =36e-3, useTanh = (False, 20)):
     wheelSpeed = wheelSpeedrpm *(2*np.pi)/60
-    wheelFrictionT = noLoadI * K
+    wheelFrictionT = noLoadI * K *-1
     if useTanh[0]:  #tanh does not accurately represent real world physica, but can be used to smooth the 0 jitter that is caused by step calculation
-        wheelFrictionT *= np.tanh(wheelSpeed/useTanh[1]) * -1
+        F99 = 0.5 * np.pi
+        wheelFrictionT *= np.tanh(wheelSpeed/F99 * np.arctanh(0.99))
     else:
-        wheelFrictionT *= np.sign(wheelSpeed) * -1
+        wheelFrictionT *= np.sign(wheelSpeed)
     return(wheelFrictionT)
     
 

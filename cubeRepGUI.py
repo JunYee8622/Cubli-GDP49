@@ -43,7 +43,7 @@ thetaInit_deg = 5
 delayTime = 15e-3
 
 '''here are what added my AI'''
-Arr_timepoints, Arr_angles, Arr_wheelAngle, Arr_wheelVels = BD.simulate(False, simulate_time, dt, thetaInit_deg, delayTime, Gains =(8.61817371e+00 ,2.47127648e-05 ,1.25690132e+00 ,1.35912411e-02))
+Arr_timepoints, Arr_angles, Arr_wheelAngle, Arr_wheelVels = BD.simulate(False, simulate_time, dt, thetaInit_deg, delayTime, Gains =(7.31447120e+00 ,3.57017137e-03, 2.94549080e-01, 5.45469497e-04)) #(3.3825e+00 ,1.0250e-03 ,2.2550e-01 ,0))
 #time.sleep(5)
 bodyDyngraph_img = pygame.image.load("GUISprites/bodyDynamics.jpg").convert()
 graphW, graphH = 900, 450
@@ -72,8 +72,8 @@ def makeGraphMapper(axIndex, yData):
         return (int(x), int(y))
     return toPixel
 
-angleDotPos = makeGraphMapper(0, Arr_angles)
-wheelDotPos = makeGraphMapper(1, Arr_wheelVels)
+# angleDotPos = makeGraphMapper(0, Arr_angles)
+# wheelDotPos = makeGraphMapper(1, Arr_wheelVels)
 '''until here '''
 
 
@@ -82,8 +82,8 @@ i = 0
 
 scW, scH = screen.get_size()
 
-angAmplVis = 4
-
+angAmplVis = 1
+print(Arr_angles[-1])
 while running:
     cubePoints = np.copy(cubePointsRelative)
     screen.fill((234, 226, 183))
@@ -94,13 +94,14 @@ while running:
 
 
     wheelAngle_deg = np.rad2deg(Arr_wheelAngle[i])
-    rotatedWheel = pygame.transform.rotate(reactionWheel_img, -wheelAngle_deg)
+    cubeAngle_deg = Arr_angles[i]
+    rotatedWheel = pygame.transform.rotate(reactionWheel_img, -(wheelAngle_deg + cubeAngle_deg))
     wheelRect = rotatedWheel.get_rect(center=(float(wheelCentre[0]), float(wheelCentre[1])))
 
     
     screen.blit(bodyDyngraph_img, (0,0))
-    pygame.draw.circle(screen, (255, 0, 0), angleDotPos(i), 5)
-    pygame.draw.circle(screen, (255, 0, 0), wheelDotPos(i), 5)
+    # pygame.draw.circle(screen, (255, 0, 0), angleDotPos(i), 5)
+    # pygame.draw.circle(screen, (255, 0, 0), wheelDotPos(i), 5)
     cubeface = pygame.draw.polygon(screen, (214, 40, 40), cubePoints)
     screen.blit(rotatedWheel, wheelRect)
     vertline = pygame.draw.line(screen, (0, 48, 73), (pivotPosition), (pivotPosition + (0, -2*L*pixelscale)))
@@ -115,9 +116,10 @@ while running:
 
     pygame.display.flip()
 
+    slowFactor = 1
     delta_time = clock.tick(60) / 1000
-    delta_time = max(0.001, min(0.1, delta_time))
-    i +=  int(0.5*delta_time / dt)
+    delta_time = slowFactor * max(0.001, min(0.1, delta_time))
+    i +=  int(0.2*delta_time / dt)
     if i >= len(Arr_timepoints):
         i = 0
         print("loop")
