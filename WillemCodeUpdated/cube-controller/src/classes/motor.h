@@ -10,7 +10,9 @@ class Motor {
     public:
         // Class constructor
         Motor(int pin_enable, int pin_current);
-        // Initialize
+        // Start PWM output at the neutral value (call first thing in setup(), before anything slow such as WiFi)
+        void begin();
+        // Initialize (also spins the motor in both directions very briefly)
         void init();
         // Set current (A)
         void set_current(float ia);
@@ -18,8 +20,6 @@ class Motor {
         void set_torque(float tau);
 
     private:
-        // PWM channel
-        int channel;
         // Pins
         int pin_enable, pin_current;
 };

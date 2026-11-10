@@ -34,7 +34,7 @@ const float b = 0.0;
 const float Ra = 0.942; // Armature (winding) resistance (Ohm)
 const float La = 0.363e-3; // Armature (winding) inductance (H)
 const float Km = 36e-3; // Torque constant (Nm/A)
-const float ia_max = 6; // Maximum current (A)
+const float ia_max = 2; // Maximum current (A)
 const float omega_nl = 6250 * pi / 30; // No load speed (rad/s)
 
 // Mechanical motor properties

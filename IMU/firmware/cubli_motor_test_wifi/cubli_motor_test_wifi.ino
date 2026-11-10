@@ -77,15 +77,15 @@ static bool        LOOP_SEQUENCE   = true;
 // absorb it can make the ESCON trip on overvoltage -> use a battery). 0 = cut current and coast.
 #define STOP_ACTIVE 1
 static const float STOP_TIME_S       = 0.5f;   // requested time for peak -> 0 rpm. 0 = true step to zero
-static const float I_STOP_MAX        = 6.0f;   // A. ESCON Module 24/2: 6 A peak for < 4 s. In ESCON Studio the
+static const float I_STOP_MAX        = 2.0f;   // A. ESCON Module 24/2: 6 A peak for < 4 s. In ESCON Studio the
                                                // max output current limit must be >= this, or it is clipped.
-static const float STOP_DECEL_MARGIN = 0.92f;  // plan the stop reference at 92 % of what the clamp can do
+static const float STOP_DECEL_MARGIN = 0.90f;  // plan the stop reference at 92 % of what the clamp can do
 static const float STOP_TIMEOUT_S    = STOP_ACTIVE ? 3.0f : 30.0f;
 
 // Limits
 static const float I_TEST_MAX      = 2.0f;     // A  clamp while ramping up / holding speed (ESCON continuous)
-static const float WHEEL_ABORT_RPM = 2600.0f;  // hard overspeed cut-off (profile / speed hold)
-static const float MAN_MAX_RPM     = 1500.0f;  // open-loop current test stops here
+static const float WHEEL_ABORT_RPM = 3000.0f;  // hard overspeed cut-off (profile / speed hold)
+static const float MAN_MAX_RPM     = 3000.0f;  // open-loop current test stops here
 static const float MAN_TIMEOUT_S   = 6.0f;     // open-loop current test duration limit
 static const float SLEW_RPM_S      = 500.0f;   // speed-hold setpoint slew rate
 
