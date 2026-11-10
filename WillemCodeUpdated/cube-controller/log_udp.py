@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """log_udp.py - receive the cube-controller telemetry stream from the ESP32 over WiFi (UDP),
 save it to a CSV file and show it live.
+g
+g
+g
 
 Usage (laptop and ESP32 must be on the same WiFi / hotspot):
     python log_udp.py                       # find the ESP32 on the WiFi subnet automatically, save + live readout
