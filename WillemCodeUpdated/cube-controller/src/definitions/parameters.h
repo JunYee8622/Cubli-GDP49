@@ -66,7 +66,7 @@ const float ldw = 150; // How much do you trust the hall sensor compared to the 
 
 // Controller gains. These must be re-tuned if your cube has different dynamics (weights, inertias, dimensions, etc.)
 const float kp = 415;
-const float kd = 52.46;
+const float kd = 48.46;
 const float kpw = 2.661e-6;
 const float kdw = 0.08642;
 
@@ -80,7 +80,7 @@ const float kdw = 0.08642;
 // const float qu3 =  0.0;
 
 // Quaternion reference (Cubli sitting on x axis edge, corrected for center of mass misalignment)
-const float phi_e = 0 * pi / 180.0;
+const float phi_e = 0.84 * pi / 180.0; // Balance-point offset (deg). If phi lying flat reads ~46.7 instead of ~45, flip the sign.
 const float qu0 = cos(phi_e / 2.0 - pi / 8.0);
 const float qu1 = cos(phi_e / 2.0 + 3.0 * pi / 8.0);
 const float qu2 = 0.0;
@@ -106,7 +106,7 @@ const float qu2_qu3 = qu2 * qu3;
 const float qu3_qu3 = qu3 * qu3;
 
 // Minimum and maximum error limits (for control safety)
-const float phi_min = 2.5 * pi / 180.0;
+const float phi_min = 5.0 * pi / 180.0; // Arms (starts balancing) when within this angle of the balance point
 const float phi_max = 40.0 * pi / 180.0;
 
 // Minimum jerk trajectory parameters

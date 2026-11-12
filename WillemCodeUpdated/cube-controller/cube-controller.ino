@@ -35,8 +35,8 @@
 
 #if OTA
   // WiFi settings
-  const char* wifi_ssid = "Jun Yee";
-  const char* wifi_password = "12345678900";
+  const char* wifi_ssid = "iPhone";
+  const char* wifi_password = "Cubli1234567890";
 #endif
 
 // Pins of the slot the motor is plugged into (see MOTOR_SLOT above)
@@ -73,6 +73,14 @@ TickTwo timer_led(control_led, 200, 0, MILLIS);
   // Handle OTA flashing requests every 5 seconds
   void handle_ota();
   TickTwo timer_ota(handle_ota, 5000, 0, MILLIS);
+
+  // WiFi is optional: wait at most this long at boot, then keep (re)connecting in the background every second
+  const uint32_t WIFI_BOOT_WAIT_MS = 5000;
+  const uint32_t WIFI_RETRY_MS = 10000;
+  void wifi_service();
+  TickTwo timer_wifi(wifi_service, 1000, 0, MILLIS);
+  bool net_up = false;     // OTA + UDP listener started on the current connection
+  bool ota_started = false;
 #endif
 
 #if OTA && UDP_STREAM
@@ -114,6 +122,14 @@ bool flag_remote_stop = false;
 // True while the wheel speed limit (MAX_WHEEL_RPM) is cutting the torque
 bool flag_rpm_limit = false;
 
+// Auto re-arm after a halt: once the cube lies flat on a face (about 45 deg from the edge balance point) and is still
+// for FLAT_HOLD_STEPS controller steps, the halt is cleared. The cube then arms again when lifted to within phi_min.
+const float FLAT_MIN = 38.0 * pi / 180.0;
+const float FLAT_MAX = 52.0 * pi / 180.0;
+const float FLAT_GYRO_MAX = 0.1;                       // rad/s (about 6 deg/s): cube must be at rest
+const unsigned int FLAT_HOLD_STEPS = (unsigned int)(0.5 * f);  // 0.5 s
+unsigned int flat_count = 0;
+
 // Torques
 float tau_1 = 0, tau_2 = 0, tau_3 = 0;
 
@@ -127,18 +143,24 @@ void setup() {
   Serial.println("This is the ESP32 cube controller.");
 
   #if OTA
-    // Set up WiFi connection
+    // Set up WiFi connection. WiFi is optional: the cube waits at most WIFI_BOOT_WAIT_MS here, then runs anyway.
+    // If the hotspot is not there yet, wifi_service() keeps retrying in the background and starts OTA + telemetry
+    // as soon as it connects.
     WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    ArduinoOTA.setHostname("Cube ESP32");
     WiFi.begin(wifi_ssid, wifi_password);
 
-    unsigned int nAttempts = 0;
-    while (WiFi.waitForConnectResult() != WL_CONNECTED && nAttempts < 3) {
-      delay(1000);
-      nAttempts++;
+    uint32_t wifi_t0 = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - wifi_t0 < WIFI_BOOT_WAIT_MS) {
+      delay(100);
     }
 
-    // If WiFi connection failed, indicate this using six yellow flashes
-    if(WiFi.waitForConnectResult() != WL_CONNECTED) {
+    if(WiFi.status() == WL_CONNECTED) {
+      wifi_service();
+    } else {
+      // No WiFi: five yellow flashes, then continue without it (it keeps trying in the background)
+      Serial.println("WiFi not found, running without it (will keep trying in the background).");
       for(int i = 0; i < 5; i++) {
         neopixelWrite(LED_PIN, 255, 255, 0);
         delay(250);
@@ -146,26 +168,6 @@ void setup() {
         delay(250);
       }
     }
-
-    // Set hostname
-    ArduinoOTA.setHostname("Cube ESP32");
-
-    // Print WiFi status
-    Serial.print("Connected to WiFi (local IP is ");
-    Serial.print(WiFi.localIP());
-    Serial.println(").");
-
-    // Set up OTA flashing using ArduinoOTA
-    ArduinoOTA.begin();
-
-    #if UDP_STREAM
-      // Listen for the laptop's log_udp.py (only possible when WiFi connected)
-      if(WiFi.status() == WL_CONNECTED) {
-        udp.begin(UDP_PORT);
-        Serial.print("Telemetry: listening for log_udp.py on UDP port ");
-        Serial.println(UDP_PORT);
-      }
-    #endif
   #endif
 
   // Delay for one second to allow Maxon ESCON drivers to fully initialize
@@ -189,8 +191,9 @@ void setup() {
   timer_led.start();
 
   #if OTA
-    // OTA handler timer
+    // OTA handler and background WiFi timers
     timer_ota.start();
+    timer_wifi.start();
   #endif
 
   #if OTA && UDP_STREAM
@@ -204,8 +207,9 @@ void loop() {
   timer_led.update();
 
   #if OTA
-    // Handle OTA updates
+    // Handle OTA updates and background WiFi (re)connection
     timer_ota.update();
+    timer_wifi.update();
   #endif
 
   #if OTA && UDP_STREAM
@@ -215,7 +219,41 @@ void loop() {
 
 #if OTA
   void handle_ota(){
-    ArduinoOTA.handle();
+    if(net_up) ArduinoOTA.handle();
+  }
+
+  // Starts OTA + the telemetry listener when WiFi (re)connects, and retries the connection while it is down.
+  // Never blocks, so the controller keeps running whether or not WiFi is there.
+  void wifi_service() {
+    static uint32_t last_retry = 0;
+    bool connected = (WiFi.status() == WL_CONNECTED);
+
+    if(connected && !net_up) {
+      net_up = true;
+      Serial.print("Connected to WiFi (local IP is ");
+      Serial.print(WiFi.localIP());
+      Serial.println(").");
+      if(!ota_started) {
+        ArduinoOTA.begin();
+        ota_started = true;
+      }
+      #if UDP_STREAM
+        udp.stop();
+        udp.begin(UDP_PORT);
+        Serial.print("Telemetry: listening for log_udp.py on UDP port ");
+        Serial.println(UDP_PORT);
+      #endif
+    } else if(!connected) {
+      if(net_up) {
+        net_up = false;
+        Serial.println("WiFi lost, controller keeps running. Reconnecting in the background.");
+      }
+      if(millis() - last_retry >= WIFI_RETRY_MS) {
+        last_retry = millis();
+        WiFi.disconnect();
+        WiFi.begin(wifi_ssid, wifi_password);
+      }
+    }
   }
 #endif
 
@@ -228,7 +266,7 @@ void loop() {
   }
 
   void telemetry() {
-    if(WiFi.status() != WL_CONNECTED) return;
+    if(!net_up || WiFi.status() != WL_CONNECTED) return;
 
     // Read messages from the laptop: "hello" (keepalive), "h" (send header again), "m" (marker), "x" (stop the motor),
     // "g" (go: allow the controller to arm again)
@@ -279,9 +317,12 @@ void loop() {
           flag_terminate = false;
           flag_tra = false;
           phi_lim = phi_min;
+          flat_count = 0;
         }
-        const char reply[] = "# GO: controller enabled. It arms when the cube is within 5 deg of the balance point.\n";
-        udp_send(reply, sizeof(reply) - 1);
+        char reply[112];
+        int rn = snprintf(reply, sizeof(reply), "# GO: controller enabled. It arms when the cube is within %.1f deg of the "
+          "balance point (now %.1f deg).\n", phi_min * 180.0 / pi, phi * 180.0 / pi);
+        if(rn > 0) udp_send(reply, rn);
       }
     }
 
@@ -331,7 +372,8 @@ void controller() {
 
   // Controller enable and disable logic. The controller only activates once its orientation is such that the error with
   // respect to the desired orientation is smaller than phi_min. As soon as this is reached, the error tolerance phi_lim
-  // is increased to phi_max. If this error is exceeded, the controller is disabled until the chip is reset.
+  // is increased to phi_max. If this error is exceeded, the controller halts until the cube is laid flat (auto reset
+  // below) or a remote "g" is received.
   if(abs(phi) <= phi_lim && !flag_terminate && !flag_remote_stop) {
     // Controller is active
     flag_arm = true;
@@ -367,6 +409,25 @@ void controller() {
     if(flag_arm) {
       flag_arm = false;
       flag_terminate = true;
+      phi_lim = phi_min;
+      flat_count = 0;
+    }
+  }
+
+  // Auto reset after a halt: lying flat and still for 0.5 s clears the halt (LED goes from blinking red to solid red)
+  if(flag_terminate && !flag_remote_stop) {
+    float gyro = sqrt(att_est.omega_x * att_est.omega_x + att_est.omega_y * att_est.omega_y +
+      att_est.omega_z * att_est.omega_z);
+    if(phi >= FLAT_MIN && phi <= FLAT_MAX && gyro < FLAT_GYRO_MAX) {
+      flat_count++;
+      if(flat_count >= FLAT_HOLD_STEPS) {
+        flag_terminate = false;
+        flag_tra = false;
+        phi_lim = phi_min;
+        flat_count = 0;
+      }
+    } else {
+      flat_count = 0;
     }
   }
 
@@ -403,8 +464,8 @@ void control_led() {
       led_status = !led_status;
     }
   } else {
-    if(flag_tra) {
-      // A trajectory was already generated so the cube must now be halted due to a limit error
+    if(flag_terminate) {
+      // Halted (fell past phi_max): blinking red. Lay the cube flat on a face to reset it.
       if(led_status) {
         neopixelWrite(LED_PIN, 0, 0, 0);
       } else {
@@ -412,7 +473,7 @@ void control_led() {
       }
       led_status = !led_status;
     } else {
-      // Show a solid red LED to indicate readiness to start
+      // Ready: solid red. Lift the cube to within phi_min of the balance point and it starts balancing (green).
       neopixelWrite(LED_PIN, 255, 0, 0);
     }
   }

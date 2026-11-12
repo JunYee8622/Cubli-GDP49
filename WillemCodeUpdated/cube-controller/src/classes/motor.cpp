@@ -17,9 +17,9 @@ void Motor::begin() {
 
 void Motor::init() {
     // Briefly set current to verify motor behaviour
-    set_current(0.5);
+    set_current(-0.5);
     delay(250);
-    set_current(-0.4);
+    set_current(0.4);
     delay(250);
     set_current(0);
 }
